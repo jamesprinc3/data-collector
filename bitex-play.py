@@ -3,6 +3,8 @@ from bitex.api.WSS import BitfinexWSS
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import fastparquet
+import pyarrow
 import time
 
 def type_matcher(match_type, data):
@@ -22,10 +24,11 @@ wss = BitfinexWSS()
 wss.start()
 # while 1:
     # print(wss.data_q.get())
-time.sleep(2)
+time.sleep(60)
 wss.stop()
 
-df = pd.DataFrame(index=['orderId', 'price', 'row'])
+pd.options.display.float_format = '{:.4g}'.format
+df = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
 
 # TODO: deal with initial snapshot
 while not wss.data_q.empty():
@@ -36,11 +39,16 @@ while not wss.data_q.empty():
         print(data)
         # print(len(lst[0][0]))
         row = lst[0][0]
+        timestamp = lst[1]
         print(row)
-        s= pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2]})
+        print(timestamp)
+        s= pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
         df = df.append(s, ignore_index=True)
 
-print(df.to_string())
+print(df)
+
+df.to_parquet("dump.parquet")
+df.to_pickle("dump.pickle")
 
 
 # from bitex import Kraken, Bitstamp, Gemini
