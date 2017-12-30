@@ -24,56 +24,37 @@ wss = BitfinexWSS()
 wss.start()
 # while 1:
     # print(wss.data_q.get())
-time.sleep(60)
+time.sleep(5)
 wss.stop()
 
-pd.options.display.float_format = '{:.4g}'.format
-df = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
+dfs = {}
+
+for pair in wss.pairs:
+    print(pair)
+    dfs[pair] = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
+
+# pd.options.display.float_format = '{:.4g}'.format
+# df = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
 
 # TODO: deal with initial snapshot
 while not wss.data_q.empty():
     data = wss.data_q.get()
-    _,_,lst = data
-    # print(data)
-    if type_matcher('raw_order_book', data) and pair_matcher('ETHBTC', data) and (not snapshot_matcher(data)) :
-        print(data)
-        # print(len(lst[0][0]))
+    _,pair,lst = data
+    if type_matcher('raw_order_book', data) and (not snapshot_matcher(data)): #and pair_matcher('ETHBTC', data):
         row = lst[0][0]
         timestamp = lst[1]
-        print(row)
-        print(timestamp)
-        s= pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
-        df = df.append(s, ignore_index=True)
+        s = pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
+        dfs[pair] = dfs[pair].append(s, ignore_index=True)
 
-print(df)
+print(dfs)
 
-df.to_parquet("dump.parquet")
-df.to_pickle("dump.pickle")
+for key, df in dfs.items():
+    #TODO: handle case where df is empty
+    print(key)
+    print(df)
+    df.to_parquet("parquet/" + key + ".parquet")
+    df.to_pickle("pickle/" + key + ".pickle")
 
-
-# from bitex import Kraken, Bitstamp, Gemini
-# k = Kraken()
-# b = Bitstamp()
-# g = Gemini()
-
-# k.ticker('XBTUSD')
-# b.ticker('btceur')
-# g.ticker('BTC-USD')
-
-# k.ask(pair, price, size)
-# b.ask(pair, price, size)
-# g.ask(pair, price, size)
-
-# from bitex import Bitfinex
-
-# b = Bitfinex()
-
-# resp = b.ticker('BTCUSD')
-
-# print(resp)
-
-# from bitex import Kraken
-# k = Kraken()
-# response = k.ticker()
-# print(response.formatted)  # show formatted data
-# print(response.json())  # Returns all json data
+#TODO: get trades data
+#TODO: add snapshot to dataframe
+#TODO: make a separate parquet file for each pair
