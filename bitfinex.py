@@ -21,16 +21,9 @@ def snapshot_matcher(data):
     _, _, info = data
     return len(info[0][0]) != 3
 
-# TODO: deal with initial snapshot
 def handle_updates(wss, dfs):
     while not wss.data_q.empty():
-        data = wss.data_q.get()
-        _,pair,lst = data
-        if type_matcher('raw_order_book', data) and (not snapshot_matcher(data)): #and pair_matcher('ETHBTC', data):
-            row = lst[0][0]
-            timestamp = lst[1]
-            s = pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
-            dfs[pair] = dfs[pair].append(s, ignore_index=True)
+        handle_update(wss.data_q.get(), dfs)
 
 #PRE: timeout must be in the future
 def handle_updates_sync(wss, dfs, timeout):
@@ -72,8 +65,7 @@ wss.stop()
 
 
 #TODO: get trades data
-#TODO: add snapshot to dataframe
-
+#TODO: deal with initial snapshot
 
 #TODO: reconstruct orderbook at a given time
 # The major issue here is figuring out when we should get a snapshot
