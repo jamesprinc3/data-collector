@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import fastparquet
 import pyarrow
 import time
+import datetime
 
 def type_matcher(match_type, data):
     typ, _, _ = data
@@ -20,12 +21,41 @@ def snapshot_matcher(data):
     _, _, info = data
     return len(info[0][0]) != 3
 
+# TODO: deal with initial snapshot
+def handle_updates(wss, dfs):
+    while not wss.data_q.empty():
+        data = wss.data_q.get()
+        _,pair,lst = data
+        if type_matcher('raw_order_book', data) and (not snapshot_matcher(data)): #and pair_matcher('ETHBTC', data):
+            row = lst[0][0]
+            timestamp = lst[1]
+            s = pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
+            dfs[pair] = dfs[pair].append(s, ignore_index=True)
+
+#PRE: timeout must be in the future
+def handle_updates_sync(wss, dfs, timeout):
+    while datetime.datetime.utcnow() < timeout:
+        handle_update(wss.data_q.get(), dfs)
+
+def handle_update(data, dfs):
+    _, pair, lst = data
+    if type_matcher('raw_order_book', data) and (not snapshot_matcher(data)):  # and pair_matcher('ETHBTC', data):
+        row = lst[0][0]
+        timestamp = lst[1]
+        s = pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
+        dfs[pair] = dfs[pair].append(s, ignore_index=True)
+
+def save_dfs(dfs):
+    for key, df in dfs.items():
+        #TODO: handle case where df is empty
+        print(key)
+        print(df)
+        df.to_parquet("parquet/" + key + ".parquet")
+        df.to_pickle("pickle/" + key + ".pickle")
+
+
 wss = BitfinexWSS()
 wss.start()
-# while 1:
-    # print(wss.data_q.get())
-time.sleep(5)
-wss.stop()
 
 dfs = {}
 
@@ -33,28 +63,20 @@ for pair in wss.pairs:
     print(pair)
     dfs[pair] = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
 
-# pd.options.display.float_format = '{:.4g}'.format
-# df = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
+stop_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=5)
 
-# TODO: deal with initial snapshot
-while not wss.data_q.empty():
-    data = wss.data_q.get()
-    _,pair,lst = data
-    if type_matcher('raw_order_book', data) and (not snapshot_matcher(data)): #and pair_matcher('ETHBTC', data):
-        row = lst[0][0]
-        timestamp = lst[1]
-        s = pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
-        dfs[pair] = dfs[pair].append(s, ignore_index=True)
+handle_updates_sync(wss, dfs, stop_time)
+save_dfs(dfs)
 
-print(dfs)
+wss.stop()
 
-for key, df in dfs.items():
-    #TODO: handle case where df is empty
-    print(key)
-    print(df)
-    df.to_parquet("parquet/" + key + ".parquet")
-    df.to_pickle("pickle/" + key + ".pickle")
 
 #TODO: get trades data
 #TODO: add snapshot to dataframe
-#TODO: make a separate parquet file for each pair
+
+
+#TODO: reconstruct orderbook at a given time
+# The major issue here is figuring out when we should get a snapshot
+# def reconstruct_orderbook(snapshot, data, time):
+
+
