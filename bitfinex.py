@@ -47,21 +47,22 @@ def save_dfs(dfs):
         df.to_pickle("pickle/" + key + ".pickle")
 
 
-wss = BitfinexWSS()
-wss.start()
+def bitfinex():
+    wss = BitfinexWSS()
+    wss.start()
 
-dfs = {}
+    dfs = {}
 
-for pair in wss.pairs:
-    print(pair)
-    dfs[pair] = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
+    for pair in wss.pairs:
+        print(pair)
+        dfs[pair] = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
 
-stop_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=5)
+    stop_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=5)
 
-handle_updates_sync(wss, dfs, stop_time)
-save_dfs(dfs)
+    handle_updates_sync(wss, dfs, stop_time)
+    save_dfs(dfs)
 
-wss.stop()
+    wss.stop()
 
 
 #TODO: get trades data
