@@ -4,7 +4,6 @@ from bitex.api.WSS import GeminiWSS
 from bitex.api.WSS import BitfinexWSS
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import fastparquet
 import pyarrow
 import time
