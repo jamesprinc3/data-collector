@@ -1,16 +1,10 @@
 import threading
 
-from bitex.api.WSS import GeminiWSS
 from bitex.api.WSS import BitfinexWSS
 import pandas as pd
-import numpy as np
-import fastparquet
-import pyarrow
 import time
 import datetime
-import pathlib
 import logging
-import sys
 import os
 
 log = logging.getLogger(__name__)
