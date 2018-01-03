@@ -9,6 +9,12 @@ import fastparquet
 import pyarrow
 import time
 import datetime
+import pathlib
+import logging
+import sys
+import os
+
+log = logging.getLogger(__name__)
 
 def type_matcher(match_type, data):
     typ, _, _ = data
@@ -47,25 +53,36 @@ def handle_feed_update(data, dfs):
         s = pd.Series({'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
         dfs[pair] = dfs[pair].append(s, ignore_index=True)
 
-def handle_snapshot_update(data, dfs):
-    _, pair, lst = data
+def handle_snapshot_update(data, df):
     if type_matcher('raw_order_book', data) and snapshot_matcher(data):
-        # print(data)
+        _, pair, lst = data
+        print("in snapshot update")
         timestamp = lst[1]
         orders = lst[0][0]
         # print(orders)
         for order in orders:
             # print(order)
-            s = pd.Series({'orderId': order[0], 'price': order[1], 'amount': order[2], 'timestamp': timestamp})
-            dfs[pair] = dfs[pair].append(s, ignore_index=True)
+            s = pd.Series({'pair': pair, 'orderId': order[0], 'price': order[1], 'amount': order[2], 'timestamp': timestamp})
+            df = df.append(s, ignore_index=True)
+    return df
 
 def save_dfs(dfs):
     for pair, df in dfs.items():
         #TODO: handle case where df is empty
         df.to_parquet("parquet/" + pair + ".parquet")
 
-def save_orderbook_snapshot_df(exchange, pair, df):
-    df.to_parquet("parquet/" + exchange + "/" + "orderbook/snapshots/" + pair + ".parquet")
+def save_orderbook_snapshot_df(exchange, df):
+    today = datetime.datetime.utcnow().date()
+    print(today)
+    path = "parquet/bitfinex/orderbook/snapshots/" + str(today) + ".parquet"
+
+    if os.path.exists(path):
+        existing_df = pd.read_parquet(path)
+        df_to_save = existing_df.append(df)
+    else:
+        df_to_save = df
+
+    df_to_save.to_parquet("parquet/" + exchange + "/" + "orderbook/snapshots/" + str(today) + ".parquet")
 
 #TODO: perhaps feed isn't the best name for this?
 #TODO: make these functions just generate strings so that we can test we are generating the correct path
@@ -87,27 +104,25 @@ def bitfinex():
         pass
 
 def snapshots_getter(interval: datetime.timedelta):
-    # while True:
+    while True:
         wss = BitfinexWSS()
         wss.start()
 
-        dfs = {}
-
-        for pair in wss.pairs:
-            print(pair)
-            dfs[pair] = pd.DataFrame(index=['orderId', 'price', 'amount', 'timestamp'])
+        df = pd.DataFrame(index=['pair', 'orderId', 'price', 'amount', 'timestamp'])
 
         time.sleep(2)
         wss.stop()
 
         while not wss.data_q.empty():
-            handle_snapshot_update(wss.data_q.get(), dfs)
+            df = handle_snapshot_update(wss.data_q.get(), df)
 
-        for pair, df in dfs.items():
-            #TODO: handle empty df
-            save_orderbook_snapshot_df("bitfinex", pair, df)
+        print(df)
+        # try:
+        save_orderbook_snapshot_df("bitfinex", df)
+        # except:
+        #     log.debug("Snapshot DataFrame couldn't be saved: ", sys.exc_info()[0])
 
-        # time.sleep(interval.seconds - 1)
+        time.sleep(interval.seconds - 1)
 
 def feed_getter(interval: datetime.timedelta):
     wss = BitfinexWSS()
@@ -133,5 +148,3 @@ bitfinex()
 #TODO: create file paths on startup
 # The major issue here is figuring out when we should get a snapshot
 # def reconstruct_orderbook(snapshot, data, time):
-
-
