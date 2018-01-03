@@ -8,3 +8,4 @@ pusherclient==0.3.0
 autobahn_rce==0.6.0.5
 PyJWT==1.5.3
 websocket_client==0.46.0
+fastparquet

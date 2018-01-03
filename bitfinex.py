@@ -6,6 +6,7 @@ import time
 import datetime
 import logging
 import os
+import pathlib
 
 log = logging.getLogger(__name__)
 
@@ -84,6 +85,9 @@ def save_orderbook_feed_df(exchange, pair, df):
 
 
 def bitfinex():
+    pathlib.Path('parquet/bitfinex/orderbook/snapshots').mkdir(parents=True, exist_ok=True)
+    pathlib.Path('parquet/bitfinex/orderbook/feed').mkdir(parents=True, exist_ok=True)
+
     feed_save_interval = datetime.timedelta(seconds=5)
     snapshot_save_interval = datetime.timedelta(seconds=5)
 
