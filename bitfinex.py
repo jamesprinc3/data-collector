@@ -126,8 +126,8 @@ def queue_getter(interval: datetime.timedelta):
     wss.stop()
 
 
-logger = logging.getLogger()
-logger.setLevel(logging.WARNING)
+# logger = logging.getLogger()
+# logger.setLevel(logging.WARNING)
 bitfinex()
 
 
