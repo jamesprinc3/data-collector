@@ -40,6 +40,7 @@ class BitfinexClient():
         self.wss.stop()
         self.save_feed_df("bitfinex", self.feed_df)
         self.save_trades_df("bitfinex", self.trades_df)
+        self.wss.stop()
 
     def on_message(self, data):
         if self.type_matcher('trades', data) and (not self.trade_snapshot_matcher(data)):
