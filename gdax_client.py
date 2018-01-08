@@ -31,9 +31,9 @@ class GdaxClient(gdax.WebsocketClient):
         return
 
     def interrupt(self):
-        self.close()
         self.drain()
         self.save_feed_df(self.exchange, self.feed_df)
+        self.close()
 
     def on_open(self):
         self.url = "wss://ws-feed.gdax.com/"
