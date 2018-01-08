@@ -6,6 +6,7 @@ import logging
 import os
 import pathlib
 import threading
+import log
 
 
 class GdaxClient(gdax.WebsocketClient):
@@ -14,7 +15,7 @@ class GdaxClient(gdax.WebsocketClient):
         pathlib.Path('parquet/gdax/orderbook/trades').mkdir(parents=True, exist_ok=True)
         pathlib.Path('parquet/gdax/orderbook/feed').mkdir(parents=True, exist_ok=True)
 
-        self.log = logging.getLogger(__name__)
+        self.log = log.setup_custom_logger(__name__)
         # feed_df = pd.DataFrame(index=['pair', 'orderId', 'price', 'amount', 'timestamp'])
         self.feed_df = pd.DataFrame()
         self.trades_df = pd.DataFrame(index=['pair', 'type', 'tradeId', 'price', 'amount', 'exchange_timestamp', 'timestamp'])
@@ -24,6 +25,8 @@ class GdaxClient(gdax.WebsocketClient):
 
         self.feed = list()
 
+        self.products = list()
+
         thread = threading.Thread(target=self.handle_queue_with_interval, args=())
         thread.daemon = True
         thread.start()
@@ -31,15 +34,20 @@ class GdaxClient(gdax.WebsocketClient):
         return
 
     def interrupt(self):
+        self.log.info("Interrupt started")
         self.drain()
         self.save_feed_df(self.exchange, self.feed_df)
         self.close()
+        self.log.info("Interrupt complete")
 
     def on_open(self):
+        prods = gdax.PublicClient().get_products()
+        for product in prods:
+            self.products.append(product['id'])
+
+        self.log.info("GDAX products: ", self.products)
         self.url = "wss://ws-feed.gdax.com/"
-        self.products = ["LTC-USD"]
-        self.message_count = 0
-        print("Lets count the messages!")
+
 
     def on_message(self, msg):
         self.feed.append(msg)
@@ -49,19 +57,21 @@ class GdaxClient(gdax.WebsocketClient):
 
     # Writes out the dataframe every interval
     def handle_queue_with_interval(self):
-        exchange = "gdax"
         while True:
             time.sleep(self.save_interval.seconds)
             self.drain()
-            self.save_feed_df(exchange, self.feed_df)
+            self.save_feed_df(self.exchange, self.feed_df)
 
     def drain(self):
+        self.log.info("Starting drain")
         loc_feed = self.feed
         self.feed = list()
         self.feed_df = pd.DataFrame(loc_feed)
+        self.log.info("Drain complete")
 
     # TODO: extract these methods out to a common class
     def save_feed_df(self, exchange, df):
+        self.log.info("Saving feed df")
         path = self.generate_path(exchange)
         self.save_df(path, df)
 
@@ -80,7 +90,7 @@ class GdaxClient(gdax.WebsocketClient):
         else:
             df_to_save = df
 
-        print("Saved gdax df " + str(df_to_save.count()))
+        self.log.info("Saved gdax df\n" + str(df_to_save.count()))
         df_to_save.to_parquet(path)
 
 

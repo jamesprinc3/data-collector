@@ -6,12 +6,21 @@ from gdax_client import GdaxClient
 import signal
 import sys
 import os
+import logging
+import log
 
 if __name__ == '__main__':
 
+    logger = log.setup_custom_logger(__name__)
+    logger.info('Program started')
+
     interval = datetime.timedelta(seconds=60)
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 3:
         interval = datetime.timedelta(seconds=int(sys.argv[1]))
+        should_disable_logs = sys.argv[2] == "True"
+        # if should_disable_logs:
+            # logger = logging.getLogger()
+            # logger.setLevel(logging.WARNING)
 
     print("Interval is " + str(interval.seconds) + " seconds")
     # execute only if run as the entry point into the program
@@ -20,8 +29,6 @@ if __name__ == '__main__':
 
     bitfinex.start()
     gdax.start()
-
-    print("got here")
 
     def interrupt_handler(signal, frame):
         print('You pressed Ctrl+C!')
@@ -33,10 +40,7 @@ if __name__ == '__main__':
         gdax.close()
         # print("aqui 3")
 
-
-
     signal.signal(signal.SIGINT, interrupt_handler)
-    print('Press Ctrl+C')
 
     pidfile_path = "/tmp/data-collector.pid"
 
@@ -45,11 +49,11 @@ if __name__ == '__main__':
         other_pid = pidfile.read()
         pidfile.close()
 
-        print("pid: ", other_pid)
+        logger.info("previous process pid: ", other_pid)
         try:
             os.kill(int(other_pid), signal.SIGINT)
         except:
-            print("process doesn't exist")
+            logger.info("previous process doesn't exist")
 
     my_pid = str(os.getpid())
     pidfile = open(pidfile_path, 'w')

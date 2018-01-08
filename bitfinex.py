@@ -7,14 +7,12 @@ import logging
 import os
 import pathlib
 import time
-
+import log
 
 class BitfinexClient():
     def __init__(self, interval):
-        self.log = logging.getLogger(__name__)
+        self.log = log.setup_custom_logger(__name__)
         self.exchange = "bitfinex"
-        logger = logging.getLogger()
-        logger.setLevel(logging.WARNING)
         pathlib.Path('parquet/bitfinex/orderbook/trades').mkdir(parents=True, exist_ok=True)
         pathlib.Path('parquet/bitfinex/orderbook/feed').mkdir(parents=True, exist_ok=True)
 
@@ -32,27 +30,13 @@ class BitfinexClient():
         save_thread.daemon = True
         save_thread.start()
 
+        self.log.info("Save thread started up")
+
     def interrupt(self):
+        self.log.info("Interrupt started")
         self.wss.stop()
         self.drain_and_save()
-
-    def message_handler(self, data):
-        if self.type_matcher('trades', data) and (not self.trade_snapshot_matcher(data)):
-            _, pair, lst = data
-            trade_type = lst[0][0]
-            row = lst[0][1]
-            timestamp = lst[1]
-
-            s = pd.Series({'pair': pair, 'type': trade_type, 'tradeId': row[0], 'exchange_timestamp': row[1],
-                           'price': row[2], 'amount': row[3], 'timestamp': timestamp})
-            self.trades_df = self.trades_df.append(s, ignore_index=True)
-
-        if self.type_matcher('raw_order_book', data) and (not self.feed_snapshot_matcher(data)):
-            _, pair, lst = data
-            row = lst[0][0]
-            timestamp = lst[1]
-            s = pd.Series({'pair': pair, 'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
-            self.feed_df = self.feed_df.append(s, ignore_index=True)
+        self.log.info("Interrupt complete")
 
     def message_formatter(self, data):
         if self.type_matcher('trades', data) and (not self.trade_snapshot_matcher(data)):
@@ -101,13 +85,14 @@ class BitfinexClient():
 
     # TODO: refactor this?
     def drain_and_save(self):
-        print("Draining queue\n")
+        self.log.info("Draining queue")
         # Drain the queue
         self.trades = list()
         self.feed = list()
         while not self.wss.data_q.empty():
-            # print("queue size: ", self.wss.data_q.qsize())
             self.message_formatter(self.wss.data_q.get())
+
+        self.log.info("Queue drained, " + str(len(self.trades)) + " trades, " + str(len(self.feed)) + " orders")
 
         self.feed_df = self.list_to_df(self.feed)
         self.trades_df = self.list_to_df(self.trades)
@@ -115,14 +100,8 @@ class BitfinexClient():
         self.save_feed_df(self.exchange, self.feed_df)
         self.save_trades_df(self.exchange, self.trades_df)
 
-    # PRE: timeout must be in the future
-    def handle_feed_sync(self):
-        while True:
-            msg = self.wss.data_q.get()
-            self.message_handler(msg)
-
-
     def save_trades_df(self, exchange, df):
+        self.log.info("Saving trades df")
         today = datetime.datetime.utcnow().date()
         path = "parquet/" + exchange + "/orderbook/trades/" + str(today) + ".parquet"
 
@@ -131,6 +110,7 @@ class BitfinexClient():
     # TODO: perhaps feed isn't the best name for this?
     # TODO: make these functions just generate strings so that we can test we are generating the correct path
     def save_feed_df(self, exchange, df):
+        self.log.info("Saving feed df")
         today = datetime.datetime.utcnow().date()
         path = "parquet/" + exchange + "/orderbook/feed/" + str(today) + ".parquet"
 
@@ -146,12 +126,11 @@ class BitfinexClient():
         else:
             df_to_save = df
 
-        print("Saved bitfinex df " + str(df_to_save.count()))
+        self.log.info("Saved bitfinex df\n" + str(df_to_save.count()))
         df_to_save.to_parquet(path)
 
 
 #TODO: capture reference data to run back for unit/integration tests
 #TODO: reconstruct orderbook at a given time
-#TODO: create file paths on startup
 # The major issue here is figuring out when we should get a snapshot
 # def reconstruct_orderbook(snapshot, data, time):
