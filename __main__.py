@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import datetime
 
 from bitfinex import BitfinexClient
 from gdax_client import GdaxClient
@@ -7,9 +8,14 @@ import sys
 
 if __name__ == '__main__':
 
+    interval = datetime.timedelta(seconds=60)
+    if len(sys.argv) == 2:
+        interval = datetime.timedelta(seconds=int(sys.argv[1]))
+
+    print("Interval is " + str(interval.seconds) + " seconds")
     # execute only if run as the entry point into the program
-    bitfinex = BitfinexClient()
-    gdax = GdaxClient()
+    bitfinex = BitfinexClient(interval)
+    gdax = GdaxClient(interval)
 
     bitfinex.start()
     gdax.start()

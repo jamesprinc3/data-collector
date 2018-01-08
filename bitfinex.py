@@ -10,7 +10,7 @@ import time
 
 
 class BitfinexClient():
-    def __init__(self):
+    def __init__(self, interval):
         self.log = logging.getLogger(__name__)
         self.exchange = "bitfinex"
         logger = logging.getLogger()
@@ -21,16 +21,12 @@ class BitfinexClient():
         self.feed_df = pd.DataFrame(index=['pair', 'orderId', 'price', 'amount', 'timestamp'])
         self.trades_df = pd.DataFrame(index=['pair', 'type', 'tradeId', 'price', 'amount', 'exchange_timestamp', 'timestamp'])
 
-        self.interval = datetime.timedelta(seconds=5)
+        self.interval = interval
 
         self.wss = BitfinexWSS()
 
     def start(self):
         self.wss.start()
-
-        feed_thread = threading.Thread(target=self.handle_feed_sync)
-        feed_thread.daemon = True
-        feed_thread.start()
 
         save_thread = threading.Thread(target=self.handle_save)
         save_thread.daemon = True
@@ -38,11 +34,9 @@ class BitfinexClient():
 
     def interrupt(self):
         self.wss.stop()
-        self.save_feed_df("bitfinex", self.feed_df)
-        self.save_trades_df("bitfinex", self.trades_df)
-        self.wss.stop()
+        self.drain_and_save()
 
-    def on_message(self, data):
+    def message_handler(self, data):
         if self.type_matcher('trades', data) and (not self.trade_snapshot_matcher(data)):
             _, pair, lst = data
             trade_type = lst[0][0]
@@ -59,6 +53,28 @@ class BitfinexClient():
             timestamp = lst[1]
             s = pd.Series({'pair': pair, 'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
             self.feed_df = self.feed_df.append(s, ignore_index=True)
+
+    def message_formatter(self, data):
+        if self.type_matcher('trades', data) and (not self.trade_snapshot_matcher(data)):
+            _, pair, lst = data
+            trade_type = lst[0][0]
+            row = lst[0][1]
+            timestamp = lst[1]
+
+            self.trades.append({'pair': pair, 'type': trade_type, 'tradeId': row[0], 'exchange_timestamp': row[1],
+                                'price': row[2], 'amount': row[3], 'timestamp': timestamp})
+
+        if self.type_matcher('raw_order_book', data) and (not self.feed_snapshot_matcher(data)):
+            _, pair, lst = data
+            row = lst[0][0]
+            timestamp = lst[1]
+
+            self.feed.append({'pair': pair, 'orderId': row[0], 'price': row[1], 'amount': row[2], 'timestamp': timestamp})
+
+        return None
+
+    def list_to_df(self, lst):
+        return pd.DataFrame(lst)
 
     # TODO: move these matchers out into a different class
     def type_matcher(self, match_type, data):
@@ -79,17 +95,31 @@ class BitfinexClient():
 
     # Writes out the dataframe every interval
     def handle_save(self):
-
         while True:
             time.sleep(self.interval.seconds)
-            self.save_feed_df(self.exchange, self.feed_df)
-            self.save_trades_df(self.exchange, self.trades_df)
+            self.drain_and_save()
+
+    # TODO: refactor this?
+    def drain_and_save(self):
+        print("Draining queue\n")
+        # Drain the queue
+        self.trades = list()
+        self.feed = list()
+        while not self.wss.data_q.empty():
+            # print("queue size: ", self.wss.data_q.qsize())
+            self.message_formatter(self.wss.data_q.get())
+
+        self.feed_df = self.list_to_df(self.feed)
+        self.trades_df = self.list_to_df(self.trades)
+
+        self.save_feed_df(self.exchange, self.feed_df)
+        self.save_trades_df(self.exchange, self.trades_df)
 
     # PRE: timeout must be in the future
     def handle_feed_sync(self):
         while True:
             msg = self.wss.data_q.get()
-            self.on_message(msg)
+            self.message_handler(msg)
 
 
     def save_trades_df(self, exchange, df):

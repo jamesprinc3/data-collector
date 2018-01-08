@@ -9,7 +9,7 @@ import threading
 
 
 class GdaxClient(gdax.WebsocketClient):
-    def __init__(self, pairs=None):
+    def __init__(self, interval, pairs=None):
         super().__init__()
         pathlib.Path('parquet/gdax/orderbook/trades').mkdir(parents=True, exist_ok=True)
         pathlib.Path('parquet/gdax/orderbook/feed').mkdir(parents=True, exist_ok=True)
@@ -20,7 +20,9 @@ class GdaxClient(gdax.WebsocketClient):
         self.trades_df = pd.DataFrame(index=['pair', 'type', 'tradeId', 'price', 'amount', 'exchange_timestamp', 'timestamp'])
         self.exchange = "gdax"
 
-        self.save_interval = datetime.timedelta(seconds=5)
+        self.save_interval = interval
+
+        self.feed = list()
 
         thread = threading.Thread(target=self.handle_queue_with_interval, args=())
         thread.daemon = True
@@ -30,7 +32,8 @@ class GdaxClient(gdax.WebsocketClient):
 
     def interrupt(self):
         self.close()
-        self.save_feed_df("gdax", self.feed_df)
+        self.drain()
+        self.save_feed_df(self.exchange, self.feed_df)
 
     def on_open(self):
         self.url = "wss://ws-feed.gdax.com/"
@@ -39,12 +42,7 @@ class GdaxClient(gdax.WebsocketClient):
         print("Lets count the messages!")
 
     def on_message(self, msg):
-        self.message_count += 1
-
-        # print(msg)
-
-        s = pd.Series(msg)
-        self.feed_df = self.feed_df.append(s, ignore_index=True)
+        self.feed.append(msg)
 
     def on_close(self):
         print("-- Goodbye! --")
@@ -54,7 +52,12 @@ class GdaxClient(gdax.WebsocketClient):
         exchange = "gdax"
         while True:
             time.sleep(self.save_interval.seconds)
+            self.drain()
             self.save_feed_df(exchange, self.feed_df)
+
+    def drain(self):
+        self.feed_df = pd.DataFrame(self.feed)
+        self.feed = list()
 
     # TODO: extract these methods out to a common class
     def save_feed_df(self, exchange, df):
