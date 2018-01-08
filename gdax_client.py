@@ -56,8 +56,9 @@ class GdaxClient(gdax.WebsocketClient):
             self.save_feed_df(exchange, self.feed_df)
 
     def drain(self):
-        self.feed_df = pd.DataFrame(self.feed)
+        loc_feed = self.feed
         self.feed = list()
+        self.feed_df = pd.DataFrame(loc_feed)
 
     # TODO: extract these methods out to a common class
     def save_feed_df(self, exchange, df):
