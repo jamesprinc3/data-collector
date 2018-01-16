@@ -1,12 +1,10 @@
 import gdax
 import time
 import pandas as pd
-import datetime
-import logging
-import os
 import pathlib
 import threading
 import log
+import parquet_saver
 
 
 class GdaxClient(gdax.WebsocketClient):
@@ -36,7 +34,7 @@ class GdaxClient(gdax.WebsocketClient):
     def interrupt(self):
         self.log.info("Interrupt started")
         self.drain()
-        self.save_feed_df(self.exchange, self.feed_df)
+        parquet_saver.save_feed_df(self.exchange, self.feed_df)
         self.close()
         self.log.info("Interrupt complete")
 
@@ -60,7 +58,7 @@ class GdaxClient(gdax.WebsocketClient):
         while True:
             time.sleep(self.save_interval.seconds)
             self.drain()
-            self.save_feed_df(self.exchange, self.feed_df)
+            parquet_saver.save_feed_df(self.exchange, self.feed_df)
 
     def drain(self):
         self.log.info("Starting drain")
@@ -69,28 +67,6 @@ class GdaxClient(gdax.WebsocketClient):
         self.feed_df = pd.DataFrame(loc_feed)
         self.log.info("Drain complete")
 
-    # TODO: extract these methods out to a common class
-    def save_feed_df(self, exchange, df):
-        self.log.info("Saving feed df")
-        path = self.generate_path(exchange)
-        self.save_df(path, df)
 
-    def generate_path(self, exchange):
-        today = datetime.datetime.utcnow().date()
-        path = "parquet/" + exchange + "/orderbook/feed/" + str(today) + ".parquet"
-        return path
-
-    def save_df(self, path, df):
-        if df.empty:
-            return
-        elif os.path.exists(path):
-            existing_df = pd.read_parquet(path)
-            df_to_save = existing_df.append(df)
-            df_to_save.drop_duplicates()
-        else:
-            df_to_save = df
-
-        self.log.info("Saved gdax df\n" + str(df_to_save.count()))
-        df_to_save.to_parquet(path)
 
 

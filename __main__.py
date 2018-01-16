@@ -8,6 +8,7 @@ import sys
 import os
 import logging
 import log
+import time
 
 if __name__ == '__main__':
 
@@ -60,4 +61,6 @@ if __name__ == '__main__':
     pidfile.write(my_pid)
     pidfile.close()
 
+    while True:
+        time.sleep(5)
 
