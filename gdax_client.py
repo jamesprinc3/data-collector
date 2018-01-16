@@ -26,6 +26,7 @@ class GdaxClient(gdax.WebsocketClient):
         self.feed = list()
 
         self.products = list()
+        self.quarantine_path = "parquet/" + self.exchange + "/orderbook/feed/quarantine"
 
         thread = threading.Thread(target=self.handle_queue_with_interval, args=())
         thread.daemon = True
@@ -83,11 +84,18 @@ class GdaxClient(gdax.WebsocketClient):
     def save_df(self, path, df):
         if df.empty:
             return
-        elif os.path.exists(path):
+
+        try:
             existing_df = pd.read_parquet(path)
             df_to_save = existing_df.append(df)
             df_to_save.drop_duplicates()
-        else:
+        except:
+            self.log.info("Could not read existing df")
+            if os.path.exists(path):
+                self.log.info("Path exists, moving corrupt file to quarantine")
+                now = datetime.datetime.utcnow()
+                os.rename(path, self.quarantine_path + str(now) + ".parquet")
+
             df_to_save = df
 
         self.log.info("Saved gdax df\n" + str(df_to_save.count()))
