@@ -15,7 +15,7 @@ if __name__ == '__main__':
     logger = log.setup_custom_logger(__name__)
     logger.info('Program started')
 
-    interval = datetime.timedelta(seconds=60)
+    interval = datetime.timedelta(minutes=10)
     if len(sys.argv) == 3:
         interval = datetime.timedelta(seconds=int(sys.argv[1]))
         should_disable_logs = sys.argv[2] == "True"

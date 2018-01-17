@@ -14,8 +14,8 @@ def save_feed_df(exchange, df):
 
 
 def generate_path(exchange):
-    today = datetime.datetime.utcnow().date()
-    path = "parquet/" + exchange + "/orderbook/feed/" + str(today) + ".parquet"
+    now = datetime.datetime.utcnow()
+    path = "parquet/" + exchange + "/orderbook/feed/" + str(now) + ".parquet"
     return path
 
 def generate_quarantine_path(exchange):
