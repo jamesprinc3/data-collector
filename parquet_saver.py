@@ -7,15 +7,25 @@ logger = log.setup_custom_logger(__name__)
 
 
 def save_feed_df(exchange, df):
-    logger.info("Saving feed df")
-    path = generate_path(exchange)
+    logger.info("Saving feed df for"+exchange)
+    path = generate_feed_path(exchange)
     q_path = generate_quarantine_path(exchange)
     save_df(path, df, q_path)
 
+def save_trades_df(exchange, df):
+    logger.info("Saving trades df for" + exchange)
+    path = generate_trades_path(exchange)
 
-def generate_path(exchange):
+    save_df(path, df)
+
+def generate_feed_path(exchange):
     now = datetime.datetime.utcnow()
     path = "parquet/" + exchange + "/orderbook/feed/" + str(now) + ".parquet"
+    return path
+
+def generate_trades_path(exchange):
+    now = datetime.datetime.utcnow()
+    path = "parquet/" + exchange + "/orderbook/trades/" + str(now) + ".parquet"
     return path
 
 def generate_quarantine_path(exchange):

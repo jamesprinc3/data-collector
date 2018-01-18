@@ -2,12 +2,10 @@ import threading
 
 from bitex.api.WSS import BitfinexWSS
 import pandas as pd
-import datetime
-import logging
-import os
 import pathlib
 import time
 import log
+import parquet_saver
 
 class BitfinexClient():
     def __init__(self, interval):
@@ -97,37 +95,8 @@ class BitfinexClient():
         self.feed_df = self.list_to_df(self.feed)
         self.trades_df = self.list_to_df(self.trades)
 
-        self.save_feed_df(self.exchange, self.feed_df)
-        self.save_trades_df(self.exchange, self.trades_df)
-
-    def save_trades_df(self, exchange, df):
-        self.log.info("Saving trades df")
-        today = datetime.datetime.utcnow().date()
-        path = "parquet/" + exchange + "/orderbook/trades/" + str(today) + ".parquet"
-
-        self.save_df(path, df)
-
-    # TODO: perhaps feed isn't the best name for this?
-    # TODO: make these functions just generate strings so that we can test we are generating the correct path
-    def save_feed_df(self, exchange, df):
-        self.log.info("Saving feed df")
-        today = datetime.datetime.utcnow().date()
-        path = "parquet/" + exchange + "/orderbook/feed/" + str(today) + ".parquet"
-
-        self.save_df(path, df)
-
-    def save_df(self, path, df):
-        if df.empty:
-            return
-        elif os.path.exists(path):
-            existing_df = pd.read_parquet(path)
-            df_to_save = existing_df.append(df)
-            df_to_save.drop_duplicates()
-        else:
-            df_to_save = df
-
-        self.log.info("Saved bitfinex df\n" + str(df_to_save.count()))
-        df_to_save.to_parquet(path)
+        parquet_saver.save_feed_df(self.exchange, self.feed_df)
+        parquet_saver.save_trades_df(self.exchange, self.trades_df)
 
 
 #TODO: capture reference data to run back for unit/integration tests
