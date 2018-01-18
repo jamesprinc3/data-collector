@@ -1,6 +1,8 @@
 import datetime
 import os
 import pandas as pd
+import pathlib
+
 import log
 
 logger = log.setup_custom_logger(__name__)
@@ -9,8 +11,8 @@ logger = log.setup_custom_logger(__name__)
 def save_feed_df(exchange, df):
     logger.info("Saving feed df for"+exchange)
     path = generate_feed_path(exchange)
-    q_path = generate_quarantine_path(exchange)
-    save_df(path, df, q_path)
+    save_df(path, df)
+
 
 def save_trades_df(exchange, df):
     logger.info("Saving trades df for" + exchange)
@@ -18,38 +20,28 @@ def save_trades_df(exchange, df):
 
     save_df(path, df)
 
+
+# TODO: string interpolation?
 def generate_feed_path(exchange):
-    now = datetime.datetime.utcnow()
-    path = "parquet/" + exchange + "/orderbook/feed/" + str(now) + ".parquet"
+    today = datetime.datetime.utcnow().date()
+    time = datetime.datetime.utcnow().time()
+    path = "parquet/" + exchange + "/orderbook/feed/" + str(today) + "/" + str(time) + ".parquet"
     return path
+
 
 def generate_trades_path(exchange):
-    now = datetime.datetime.utcnow()
-    path = "parquet/" + exchange + "/orderbook/trades/" + str(now) + ".parquet"
+    today = datetime.datetime.utcnow().date()
+    time = datetime.datetime.utcnow().time()
+    path = "parquet/" + exchange + "/orderbook/trades/" + str(today) + "/" + str(time) + ".parquet"
     return path
 
-def generate_quarantine_path(exchange):
-    q_path = "parquet/" + exchange + "/orderbook/feed/quarantine/"
-    return q_path
 
-
-def save_df(path, df, quarantine_path):
+def save_df(path, df):
 
     if df.empty:
         return
 
-    try:
-        existing_df = pd.read_parquet(path)
-        df_to_save = existing_df.append(df)
-        df_to_save.drop_duplicates()
-    except:
-        logger.info("Could not read existing df")
-        if os.path.exists(path):
-            logger.info("Path exists, moving corrupt file to quarantine")
-            now = datetime.datetime.utcnow()
-            os.rename(path, quarantine_path + str(now) + ".parquet")
+    pathlib.Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
 
-        df_to_save = df
-
-    logger.info("Saved df\n" + str(df_to_save.count()))
-    df_to_save.to_parquet(path)
+    logger.info("Saved df\n" + str(df.count()))
+    df.to_parquet(path)
