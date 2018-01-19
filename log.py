@@ -7,7 +7,7 @@ def setup_custom_logger(name):
 
     # create a file handler
     handler = logging.FileHandler('logs/feed.log')
-    handler.setLevel(logging.INFO)
+    handler.setLevel(logging.DEBUG)
 
     # create a logging format
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -16,6 +16,6 @@ def setup_custom_logger(name):
     # add the handlers to the logger
     logger.addHandler(handler)
 
-    logging.getLogger('bitex').setLevel(logging.WARN)
+    # logging.getLogger('bitex').setLevel(logging.WARN)
 
     return logger
