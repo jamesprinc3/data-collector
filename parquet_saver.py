@@ -1,6 +1,5 @@
 import datetime
 import os
-import pandas as pd
 import pathlib
 
 import log
@@ -9,13 +8,13 @@ logger = log.setup_custom_logger(__name__)
 
 
 def save_feed_df(exchange, df):
-    logger.info("Saving feed df for"+exchange)
+    logger.info("Saving feed df for "+exchange)
     path = generate_feed_path(exchange)
     save_df(path, df)
 
 
 def save_trades_df(exchange, df):
-    logger.info("Saving trades df for" + exchange)
+    logger.info("Saving trades df for " + exchange)
     path = generate_trades_path(exchange)
 
     save_df(path, df)

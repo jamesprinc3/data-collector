@@ -7,6 +7,7 @@ import time
 import log
 import parquet_saver
 
+
 class BitfinexClient():
     def __init__(self, interval):
         self.log = log.setup_custom_logger(__name__)

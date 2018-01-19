@@ -14,15 +14,12 @@ class GdaxClient(gdax.WebsocketClient):
         pathlib.Path('parquet/gdax/orderbook/feed').mkdir(parents=True, exist_ok=True)
 
         self.log = log.setup_custom_logger(__name__)
-        # feed_df = pd.DataFrame(index=['pair', 'orderId', 'price', 'amount', 'timestamp'])
         self.feed_df = pd.DataFrame()
-        self.trades_df = pd.DataFrame(index=['pair', 'type', 'tradeId', 'price', 'amount', 'exchange_timestamp', 'timestamp'])
         self.exchange = "gdax"
 
         self.save_interval = interval
 
         self.feed = list()
-
         self.products = list()
 
         thread = threading.Thread(target=self.handle_queue_with_interval, args=())
@@ -46,7 +43,6 @@ class GdaxClient(gdax.WebsocketClient):
         self.log.info("GDAX products: ", self.products)
         self.url = "wss://ws-feed.gdax.com/"
 
-
     def on_message(self, msg):
         self.feed.append(msg)
 
@@ -61,7 +57,7 @@ class GdaxClient(gdax.WebsocketClient):
             parquet_saver.save_feed_df(self.exchange, self.feed_df)
 
     def drain(self):
-        self.log.info("Starting drain")
+        self.log.info("Starting drain, message count: " + str(len(self.feed)))
         loc_feed = self.feed
         self.feed = list()
         self.feed_df = pd.DataFrame(loc_feed)
