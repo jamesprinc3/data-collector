@@ -7,13 +7,15 @@ import time
 import log
 import parquet_saver
 
-
-class BitfinexClient():
+class BitfinexClient:
     def __init__(self, interval):
         self.log = log.setup_custom_logger(__name__)
         self.exchange = "bitfinex"
         pathlib.Path('parquet/bitfinex/orderbook/trades').mkdir(parents=True, exist_ok=True)
         pathlib.Path('parquet/bitfinex/orderbook/feed').mkdir(parents=True, exist_ok=True)
+
+        self.trades = list()
+        self.feed = list()
 
         self.feed_df = pd.DataFrame(index=['pair', 'orderId', 'price', 'amount', 'timestamp'])
         self.trades_df = pd.DataFrame(index=['pair', 'type', 'tradeId', 'price', 'amount', 'exchange_timestamp', 'timestamp'])
@@ -83,11 +85,12 @@ class BitfinexClient():
             self.drain_and_save()
 
     # TODO: refactor this?
+    @profile
     def drain_and_save(self):
         self.log.info("Draining queue")
         # Drain the queue
-        self.trades = list()
-        self.feed = list()
+        self.trades.clear()
+        self.feed.clear()
         while not self.wss.data_q.empty():
             self.message_formatter(self.wss.data_q.get())
 
