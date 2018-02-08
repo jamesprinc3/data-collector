@@ -7,6 +7,7 @@ import log
 import parquet_saver
 
 
+
 class GdaxClient(gdax.WebsocketClient):
     def __init__(self, interval, pairs=None):
         super().__init__()
@@ -58,10 +59,11 @@ class GdaxClient(gdax.WebsocketClient):
 
     def drain(self):
         self.log.info("Starting drain, message count: " + str(len(self.feed)))
-        loc_feed = self.feed
-        self.feed = list()
-        self.feed_df = pd.DataFrame(loc_feed)
+        local_feed = self.feed
+        self.feed.clear()
+        self.feed_df = pd.DataFrame(local_feed)
         self.log.info("Drain complete")
+
 
 
 
