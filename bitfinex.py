@@ -85,7 +85,6 @@ class BitfinexClient:
             self.drain_and_save()
 
     # TODO: refactor this?
-    @profile
     def drain_and_save(self):
         self.log.info("Draining queue")
         # Drain the queue
