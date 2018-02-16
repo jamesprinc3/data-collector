@@ -45,6 +45,7 @@ class GdaxClient(gdax.WebsocketClient):
         self.url = "wss://ws-feed.gdax.com/"
 
     def on_message(self, msg):
+        # print(msg)
         self.feed.append(msg)
 
     def on_close(self):
@@ -60,8 +61,8 @@ class GdaxClient(gdax.WebsocketClient):
     def drain(self):
         self.log.info("Starting drain, message count: " + str(len(self.feed)))
         local_feed = self.feed
-        self.feed.clear()
         self.feed_df = pd.DataFrame(local_feed)
+        self.feed.clear()
         self.log.info("Drain complete")
 
 
