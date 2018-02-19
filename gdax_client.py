@@ -1,3 +1,5 @@
+from queue import Queue
+
 import gdax
 import time
 import pandas as pd
@@ -5,7 +7,6 @@ import pathlib
 import threading
 import log
 import parquet_saver
-
 
 
 class GdaxClient(gdax.WebsocketClient):
@@ -20,7 +21,7 @@ class GdaxClient(gdax.WebsocketClient):
 
         self.save_interval = interval
 
-        self.feed = list()
+        self.feed = Queue()
         self.products = list()
 
         thread = threading.Thread(target=self.handle_queue_with_interval, args=())
@@ -41,12 +42,14 @@ class GdaxClient(gdax.WebsocketClient):
         for product in prods:
             self.products.append(product['id'])
 
-        self.log.info("GDAX products: ", self.products)
+        self.log.info("GDAX products: " + self.products)
         self.url = "wss://ws-feed.gdax.com/"
 
     def on_message(self, msg):
         # print(msg)
-        self.feed.append(msg)
+        self.feed.mutex.acquire()
+        self.feed.put(msg)
+        self.feed.mutex.release()
 
     def on_close(self):
         print("-- Goodbye! --")
@@ -59,10 +62,16 @@ class GdaxClient(gdax.WebsocketClient):
             parquet_saver.save_feed_df(self.exchange, self.feed_df)
 
     def drain(self):
-        self.log.info("Starting drain, message count: " + str(len(self.feed)))
-        local_feed = self.feed
+        print("Attempting to acquire lock")
+        self.feed.mutex.acquire()
+
+        self.log.info("Starting drain, message count: " + str(self.feed.qsize()))
+        local_feed = list()
+        while self.feed.not_empty:
+            local_feed.append(self.feed.get())
         self.feed_df = pd.DataFrame(local_feed)
-        self.feed.clear()
+
+        self.feed.mutex.release()
         self.log.info("Drain complete")
 
 
