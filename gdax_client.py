@@ -61,11 +61,8 @@ class GdaxClient(gdax.WebsocketClient):
     def drain(self):
         self.log.info("Starting drain, message count: " + str(len(self.feed)))
         local_feed = self.feed
+        self.feed = list()
         self.feed_df = pd.DataFrame(local_feed)
-        self.feed.clear()
         self.log.info("Drain complete")
-
-
-
 
 
