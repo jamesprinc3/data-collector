@@ -1,76 +1,82 @@
 #!/usr/bin/env python
-import datetime
+import configparser
+import logging
 
-from bitfinex import BitfinexClient
-from gdax_client import GdaxClient
+from gdax_ob_client import OrderBookClient
+from gdax_ws_client import GdaxClient
+
 import signal
-import os
 import log
 import time
 import argparse
+import gdax
+import datetime
+
+from pid import Pid
+
+expected_products = ['BCH-BTC', 'BCH-USD', 'BTC-EUR', 'BTC-GBP', 'BTC-USD', 'ETH-BTC', 'ETH-EUR', 'ETH-USD',
+                     'LTC-BTC', 'LTC-EUR', 'LTC-USD', 'BCH-EUR']
+
+prods = ['BCH-BTC']
 
 if __name__ == '__main__':
 
-    def interrupt_handler(signal, frame):
-        print('You pressed Ctrl+C!')
+    class DataCollector:
+        def __init__(self):
+            self.stop = False
 
-        bitfinex.interrupt()
-        # print("aqui 1")
-        gdax.interrupt()
-        # print("aqui 2")
-        gdax.close()
-        # print("aqui 3")
+            # self.logger = log.setup_custom_logger(__name__)
+            self.logger = logging.getLogger()
+            self.logger.info('Program started')
 
+            parser = argparse.ArgumentParser(
+                description='Collect level III orderbook data from GDAX and save it to parquet')
+            parser.add_argument('--config', metavar='path', type=str, nargs='?',
+                                help='path to config file')
 
-    def resolve_pid(exchange):
-        pidfile_path = "/tmp/data-collector-" + exchange + ".pid"
+            args = parser.parse_args()
+            self.logger.debug(args)
 
-        if os.path.isfile(pidfile_path):
-            pidfile = open(pidfile_path, 'r')
-            other_pid = pidfile.read()
-            pidfile.close()
+            config = configparser.ConfigParser()
+            config.read(args.config)
+            self.logger.debug(config)
 
-            logger.info("previous process pid: ", other_pid)
-            try:
-                os.kill(int(other_pid), signal.SIGINT)
-            except:
-                logger.info("previous process doesn't exist")
+            ws_save_interval = datetime.timedelta(seconds=int(config['behaviour']['ws_save_interval']))
+            ob_save_interval = datetime.timedelta(seconds=int(config['behaviour']['ob_save_interval']))
 
-        my_pid = str(os.getpid())
-        pidfile = open(pidfile_path, 'w')
-        pidfile.write(my_pid)
-        pidfile.close()
+            # TODO: confirm paths exist
 
-    logger = log.setup_custom_logger(__name__)
-    logger.info('Program started')
+            Pid.resolve_pid(config['paths']['pidfile_path'])
 
-    parser = argparse.ArgumentParser(description='Collect crypto exchange data')
-    parser.add_argument('-e', '--exchange', nargs='?',
-                        help='<Required> Exchange to listen to', required=True)
-    parser.add_argument('-v', '--verbose', nargs='?',
-                        help='Verbosity, default: false')
-    parser.add_argument('-i', '--interval', nargs='?',
-                        help='Interval between saving incoming messages', type=int, required=True)
+            products = self.get_products()
 
-    args = parser.parse_args()
-    print(args)
+            signal.signal(signal.SIGINT, self.interrupt_handler)
 
-    interval = datetime.timedelta(seconds=int(args.interval))
+            self.gdax_client = GdaxClient(config['paths']['ws_save_root'], ws_save_interval, products)
+            self.gdax_client.start()
 
-    print("Interval is " + str(interval.seconds) + " seconds")
-    # execute only if run as the entry point into the program
-    bitfinex = BitfinexClient(interval)
-    gdax = GdaxClient(interval)
+            self.obc = OrderBookClient(config['paths']['ob_save_root'], products, ob_save_interval)
+            self.obc.start()
 
-    if "bitfinex" == args.exchange:
-        resolve_pid("bitfinex")
-        bitfinex.start()
+        def interrupt_handler(self, signal, frame):
+            self.logger.info('Program interrupted, closing clients...')
+            self.gdax_client.interrupt()
+            self.gdax_client.close()
+            self.obc.stop()
 
-    if "gdax" == args.exchange:
-        resolve_pid("gdax")
-        gdax.start()
+            self.stop = True
 
-    signal.signal(signal.SIGINT, interrupt_handler)
+        def get_products(self):
+            ps = list()
+            prods_json = gdax.PublicClient().get_products()
+            for product in prods_json:
+                ps.append(product['id'])
 
-    while True:
-        time.sleep(5)
+            return ps
+
+        def loop(self):
+            while not self.stop:
+                time.sleep(1)
+
+    dc = DataCollector()
+    dc.loop()
