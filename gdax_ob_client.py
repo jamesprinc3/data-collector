@@ -23,7 +23,7 @@ class OrderBookClient:
 
         self.finished = False
         self.condition = threading.Condition()
-        self.scheduled_thread: threading.Timer = None
+        self.scheduled_thread = None
 
         self.thread = threading.Thread(target=self._go, daemon=True)
 
