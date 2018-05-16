@@ -30,24 +30,19 @@ class OrderBookClient:
         return
 
     def _go(self):
+        t0 = time.time()
         self.__get_orderbooks()
-        while not self.finished:
-            self.scheduled_thread = threading.Timer(self.interval.seconds, self.__get_orderbooks)
+        time_to_wait = self.interval.seconds - (time.time() - t0)
+
+        self.condition.acquire()
+        while not self.condition.wait_for(lambda: self.finished, time_to_wait):
+            self.scheduled_thread = threading.Thread(target=self.__get_orderbooks)
             self.scheduled_thread.start()
 
-        if self.scheduled_thread is not None:
-            self.scheduled_thread.cancel()
-
     def __get_orderbooks(self):
-        lock_acquired_time = time.time()
-
         for product in self.products:
             if not self.finished:
                 self.__get_orderbook(product)
-
-        time_to_sleep_for = self.interval.seconds - (time.time() - lock_acquired_time)
-
-        # return time_to_sleep_for
 
     def __get_orderbook(self, product: str):
         url = self.generate_request_string(product)
