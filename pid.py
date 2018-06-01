@@ -14,7 +14,7 @@ class Pid:
             other_pid = pidfile.read()
             pidfile.close()
 
-            cls._logger.info("Previous process pid: ", str(other_pid))
+            cls._logger.info("Previous process pid: " + str(other_pid))
             try:
                 os.kill(int(other_pid), signal.SIGINT)
             except:

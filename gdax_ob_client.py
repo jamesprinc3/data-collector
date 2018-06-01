@@ -8,18 +8,19 @@ from typing import List
 
 import requests
 
+from config import Config
+
 
 class OrderBookClient:
 
-    def __init__(self, obc_root: str, products: List[str], interval: datetime.timedelta):
+    def __init__(self, config: Config, products: List[str]):
         for product in products:
-            pathlib.Path(obc_root + product).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(config.ob_save_root + product).mkdir(parents=True, exist_ok=True)
+
+        self.config = config
 
         self.logger = logging.getLogger()
-
-        self.corr_root = obc_root
         self.products = products
-        self.interval = interval
 
         self.finished = False
         self.condition = threading.Condition()
@@ -32,7 +33,7 @@ class OrderBookClient:
     def _go(self):
         t0 = time.time()
         self.__get_orderbooks()
-        time_to_wait = self.interval.seconds - (time.time() - t0)
+        time_to_wait = self.config.ob_save_interval.seconds - (time.time() - t0)
 
         self.condition.acquire()
         while not self.condition.wait_for(lambda: self.finished, time_to_wait):
@@ -48,8 +49,9 @@ class OrderBookClient:
         url = self.generate_request_string(product)
         response = requests.get(url)
         if response.status_code == 200:
-            corr_path = self.corr_root + product + "/" + datetime.datetime.now().isoformat() + ".json"
-            self.json_to_file(response.json(), corr_path)
+            ob_path = self.config.ob_save_root + product + "/" + datetime.datetime.now().isoformat() + ".json"
+            self.json_to_file(response.json(), ob_path)
+            self.logger.info("Written orderbook to " + ob_path + " at " + datetime.datetime.now().isoformat())
             response.close()
         elif response.status_code == 429:
             self.logger.error("Server is rate limiting, consider increasing the request interval")
@@ -67,12 +69,12 @@ class OrderBookClient:
         return self.finished
 
     def stop(self):
+        self.logger.info("-- Closing down Order Book client --")
         self.finished = True
         if self.scheduled_thread is not None:
             self.scheduled_thread.cancel()
 
-        self.logger.info("-- Closing down Order Book feed --")
-
+        self.logger.info("-- Order Book client closed --")
         # Terminate this thread
         # self.condition.acquire()
         # self.condition.wait()
